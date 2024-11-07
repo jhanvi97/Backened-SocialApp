@@ -1,0 +1,52 @@
+[
+  {
+    "email": "jhanvi@example.com",
+    "password": "$2a$08$X7uMse9cWCjZ8fctZjfeAephPPZx/.6Iyj/ckWDBeAKvSDrfV4UQK",
+    "mobile": "1234567890",
+    "role": "registered",
+    "following": [],
+    "verified": true
+  },
+  {
+    "email": "user@example.com",
+    "password": "$2a$08$Sb.9k/mzGXgsrjGHsM7fPe3rbwMR2xXmggT/GY0hASvp.X04G1nhS",
+    "mobile": "7896541230",
+    "role": "registered",
+    "following": [],
+    "verified": true
+  },
+  {
+    "email": "nishu@example.com",
+    "password": "$2a$08$OZfu077X3MIgXctSseoow.RaQsW72I6FK1XHHL1vLp2f6I32HocYm",
+    "mobile": "1234567899",
+    "role": "registered",
+    "following": [],
+    "verified": true
+  },
+  {
+    "email": "jhanviiii@example.com",
+    "password": "$2a$08$6bWEvIXS8yGrYk9IxXNbD.NJ4Mmr6nbpczfV69.6NQ5HAwj4g3JH6",
+    "mobile": "1234567888",
+    "role": "admin",
+    "following": [
+      "nishu@example.com"
+    ],
+    "verified": true
+  },
+  {
+    "email": "jhanv@gmail.com",
+    "password": "$2a$08$KleWm3h84bEYOSBlhD11meJ2v.PSDN78l2AsULdt3HWWNLrKq.I2y",
+    "mobile": "674389847",
+    "role": "registered",
+    "following": [],
+    "verified": true
+  },
+  {
+    "email": "jha@example.com",
+    "password": "$2a$08$ZbmK1RmWFQJ0UgUasMHDQOS0BDY2UHoWulXLJCUttjLis.okUHrT.",
+    "mobile": "876567899",
+    "role": "user",
+    "following": [],
+    "verified": true
+  }
+]

@@ -1,0 +1,42 @@
+[
+  {
+    "id": 1,
+    "title": "My first post",
+    "description": "describing my first post",
+    "author": "user@example.com",
+    "comments": [
+      {
+        "id": 1,
+        "text": "This is my comment on the post",
+        "author": "nishu@example.com",
+        "replies": [
+          {
+            "id": 1,
+            "text": "This is a reply to the comment.",
+            "author": "jhanviiii@example.com"
+          },
+          {
+            "id": 2,
+            "text": "This is a reply to the comment.",
+            "author": "jhanviiii@example.com"
+          }
+        ]
+      }
+    ],
+    "likes": 1,
+    "likedBy": [
+      "jhanv@gmail.com"
+    ]
+  },
+  {
+    "id": 2,
+    "title": "My Second Post",
+    "description": "This is the content of my Second post.",
+    "author": "nishu@example.com",
+    "comments": [],
+    "likes": 1,
+    "likedBy": [
+      "jhanv@gmail.com"
+    ]
+  }
+]
