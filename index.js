@@ -42,31 +42,80 @@ const authorizeRole = (roles) => (req, res, next) => {
   next();
 };
 
-// User signup
+
 app.post("/api/signup", (req, res) => {
-  const { email, password, mobile, role = "user" } = req.body;
+  const { email, password, adminEmail, adminPassword, accountType } = req.body;
   const users = readJSONFile(USERS_FILE);
 
-  if (users.some((user) => user.email === email || user.mobile === mobile)) {
-    return res
-      .status(400)
-      .json({ message: "Email or mobile number already registered" });
+  const existingUser = users.find((user) => user.email === email);
+  if (existingUser) {
+    return res.status(400).json({ message: "User already exists" });
   }
 
-  const hashedPassword = bcrypt.hashSync(password, 8);
+  const adminUser = users.find((user) => user.role === "ADMIN");
+  const hashedPassword = bcrypt.hashSync(password, 10);
+
+  if (!adminUser) {
+    const newUser = {
+      email,
+      password: hashedPassword,
+      role: "ADMIN",
+      accountType: accountType || "public", // Default to 'public' if not provided
+      following: [],
+      followRequests: [],
+    };
+    users.push(newUser);
+    writeJSONFile(USERS_FILE, users);
+    return res
+      .status(201)
+      .json({ message: "First user created with ADMIN role", user: newUser });
+  }
+
+  if (adminEmail && adminPassword) {
+    const firstAdmin = users.find(
+      (user) =>
+        user.email === adminEmail &&
+        bcrypt.compareSync(adminPassword, user.password) &&
+        user.role === "ADMIN"
+    );
+
+    if (!firstAdmin) {
+      return res
+        .status(403)
+        .json({ message: "Admin credentials are incorrect" });
+    }
+
+    const newUser = {
+      email,
+      password: hashedPassword,
+      role: "ADMIN",
+      accountType: accountType || "public",
+      following: [],
+      followRequests: [],
+    };
+    users.push(newUser);
+    writeJSONFile(USERS_FILE, users);
+    return res
+      .status(201)
+      .json({ message: "User created with ADMIN role", user: newUser });
+  }
+
   const newUser = {
     email,
     password: hashedPassword,
-    mobile,
-    role,
+    role: "USER",
+    accountType: accountType || "public", 
     following: [],
-    verified: true,
+    followRequests: [],
   };
   users.push(newUser);
   writeJSONFile(USERS_FILE, users);
 
-  res.status(201).json({ message: "User registered successfully" });
+  return res
+    .status(201)
+    .json({ message: "User created with USER role", user: newUser });
 });
+
 
 // User login
 app.post("/api/login", (req, res) => {
@@ -76,7 +125,7 @@ app.post("/api/login", (req, res) => {
 
   if (user && bcrypt.compareSync(password, user.password)) {
     const token = jwt.sign(
-      { email: user.email, mobile: user.mobile, role: user.role },
+      { email: user.email, role: user.role },
       "your_jwt_secret",
       { expiresIn: "1h" }
     );
@@ -154,11 +203,10 @@ app.post("/api/posts/:id/like", authenticateJWT, (req, res) => {
   res.json({ message, likes: post.likes, likedBy: post.likedBy }); 
 });
 
-
 // Comment on a post
 app.post("/api/posts/:id/comments", authenticateJWT, (req, res) => {
   const { id } = req.params;
-  const { comment, parentCommentId = null } = req.body;
+  const { content, parentCommentId = null } = req.body; // Renamed `comment` to `content` for clarity
   const posts = readJSONFile(POSTS_FILE);
   const post = posts.find((p) => p.id == id);
 
@@ -166,9 +214,9 @@ app.post("/api/posts/:id/comments", authenticateJWT, (req, res) => {
 
   const newComment = {
     id: post.comments.length + 1,
-    text: comment,
+    content, // Storing the actual comment text here
     author: req.user.email,
-    replies: [],
+    replies: []
   };
 
   if (parentCommentId) {
@@ -183,37 +231,38 @@ app.post("/api/posts/:id/comments", authenticateJWT, (req, res) => {
   }
 
   writeJSONFile(POSTS_FILE, posts);
-  res.status(201).json(post);
+  res.status(201).json(newComment);
 });
 
 // Reply to a comment on a post
 app.post("/api/posts/:id/comments/:commentId/reply", authenticateJWT, (req, res) => {
   const { id, commentId } = req.params;
-  const { reply } = req.body; 
+  const { content } = req.body; 
   const posts = readJSONFile(POSTS_FILE);
-  const post = posts.find((p) => p.id == id); 
+  const post = posts.find((p) => p.id == id);
 
   if (!post) {
     return res.status(404).json({ message: "Post not found" });
   }
 
-  const comment = post.comments.find((c) => c.id == commentId); 
+  const comment = post.comments.find((c) => c.id == commentId);
 
   if (!comment) {
     return res.status(404).json({ message: "Comment not found" });
   }
 
   const newReply = {
-    id: comment.replies.length + 1, 
-    text: reply,
-    author: req.user.email, 
+    id: comment.replies.length + 1,
+    content, 
+    author: req.user.email
   };
 
-  comment.replies.push(newReply); 
-  writeJSONFile(POSTS_FILE, posts); 
+  comment.replies.push(newReply);
+  writeJSONFile(POSTS_FILE, posts);
 
-  res.status(201).json(comment); 
+  res.status(201).json(newReply);
 });
+
 
 
 // Delete a comment
@@ -267,27 +316,76 @@ app.delete(
   }
 );
 
-// Following functionality
-app.post("/api/users/follow", authenticateJWT, (req, res) => {
-  const { emailToFollow } = req.body;
+// Following functionality with account privacy check
+app.post("/api/users/follow/:emailToFollow", authenticateJWT, (req, res) => {
+  const { emailToFollow } = req.params; 
   const users = readJSONFile(USERS_FILE);
   const currentUser = users.find((user) => user.email === req.user.email);
   const userToFollow = users.find((user) => user.email === emailToFollow);
 
-  if (!userToFollow)
-    return res.status(404).json({ message: "User to follow not found" });
+  if (!userToFollow) return res.status(404).json({ message: "User to follow not found" });
 
-  if (!currentUser.following.includes(emailToFollow)) {
-    currentUser.following.push(emailToFollow);
-    writeJSONFile(USERS_FILE, users);
+  if (userToFollow.accountType === "public") {
+    if (!currentUser.following.includes(emailToFollow)) {
+      currentUser.following.push(emailToFollow);
+      writeJSONFile(USERS_FILE, users);
+      return res.json({ message: `You are now following ${emailToFollow}` });
+    }
+  } else {
+    if (!userToFollow.followRequests.includes(currentUser.email)) {
+      userToFollow.followRequests.push(currentUser.email);
+      writeJSONFile(USERS_FILE, users);
+      return res.json({ message: `Follow request sent to ${emailToFollow}` });
+    }
   }
 
-  res.json({ message: `You are now following ${emailToFollow}` });
+  return res.status(400).json({ message: "You are already following this user" });
 });
 
+
+
+// Approve follow request
+app.post("/api/users/approve-follow/:requesterEmail", authenticateJWT, (req, res) => {
+  const { requesterEmail } = req.params; 
+  const users = readJSONFile(USERS_FILE);
+  const currentUser = users.find((user) => user.email === req.user.email);
+
+  if (!currentUser || currentUser.accountType !== "private") {
+    return res.status(403).json({ message: "Access denied" });
+  }
+
+  if (!currentUser.followRequests.includes(requesterEmail)) {
+    return res.status(404).json({ message: "No follow request found from this user" });
+  }
+
+  currentUser.followRequests = currentUser.followRequests.filter((email) => email !== requesterEmail);
+  const requesterUser = users.find((user) => user.email === requesterEmail);
+  requesterUser.following.push(currentUser.email);
+  writeJSONFile(USERS_FILE, users);
+
+  res.json({ message: `Follow request from ${requesterEmail} approved` });
+});
+
+// Reject follow request
+app.post("/api/users/reject-follow/:requesterEmail", authenticateJWT, (req, res) => {
+  const { requesterEmail } = req.params; 
+  const users = readJSONFile(USERS_FILE);
+  const currentUser = users.find((user) => user.email === req.user.email);
+
+  if (!currentUser || currentUser.accountType !== "private") {
+    return res.status(403).json({ message: "Access denied" });
+  }
+
+  currentUser.followRequests = currentUser.followRequests.filter((email) => email !== requesterEmail);
+  writeJSONFile(USERS_FILE, users);
+
+  res.json({ message: `Follow request from ${requesterEmail} rejected` });
+});
+
+
 // Unfollow functionality
-app.post("/api/users/unfollow", authenticateJWT, (req, res) => {
-  const { emailToUnfollow } = req.body;
+app.post("/api/users/unfollow/:emailToUnfollow", authenticateJWT, (req, res) => {
+  const { emailToUnfollow } = req.params; 
   const users = readJSONFile(USERS_FILE);
   const currentUser = users.find((user) => user.email === req.user.email);
   const userToUnfollow = users.find((user) => user.email === emailToUnfollow);
@@ -298,7 +396,7 @@ app.post("/api/users/unfollow", authenticateJWT, (req, res) => {
 
   const index = currentUser.following.indexOf(emailToUnfollow);
   if (index > -1) {
-    currentUser.following.splice(index, 1); 
+    currentUser.following.splice(index, 1);
     writeJSONFile(USERS_FILE, users);
     return res.json({ message: `You have unfollowed ${emailToUnfollow}` });
   } else {
